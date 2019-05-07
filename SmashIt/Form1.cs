@@ -9,7 +9,7 @@ namespace SmashIt
 {
     public partial class Form1 : Form
     {
-        private List<Activity> threads = new List<Activity>();
+        private List<Activity> activities = new List<Activity>();
         public Form1()
         {
             InitializeComponent();
@@ -21,37 +21,57 @@ namespace SmashIt
             {
                 Activity a = new Activity();
                 a.start(key, name + i);
-                threads.Add(a);
+                activities.Add(a);
             }
         }
 
         private void Button1_Click(object sender, EventArgs e)
         {
-            SmashIt(textBox1.Text, textBox2.Text, 1);
+            SmashIt(textBox1.Text, textBox2.Text, Convert.ToInt32(numericUpDown1.Value));
         }
 
         private void Button2_Click(object sender, EventArgs e)
         {
+            foreach (Activity a in activities)
+            {
+                a.stop();
+            }
+            activities.Clear();
+        }
 
+        private void Form1_FormClosed(object sender, FormClosedEventArgs e)
+        {
+            if (activities.Count == 0)
+                return;
+            foreach (Activity a in activities)
+            {
+                a.stop();
+            }
         }
     }
 
     class Activity
     {
-        public Thread thread;
+        private Thread thread;
         private IWebDriver webdriver;
+        private bool running;
 
         public void start(string key, string name)
         {
+            running = true;
             thread = new Thread(() =>
             {
                 Random rnd = new Random();
-                webdriver = new ChromeDriver("./");
+                ChromeDriverService service = ChromeDriverService.CreateDefaultService();
+                service.HideCommandPromptWindow = true;
+                ChromeOptions options = new ChromeOptions();
+                options.AddArgument("--headless");
+                webdriver = new ChromeDriver(service, options);
                 webdriver.Url = "https://kahoot.it";
                 fillInKey(webdriver, key);
                 fillInUser(webdriver, name);
                 SwitchToIframe(webdriver, "gameBlockIframe");
-                while (true)
+                while (running)
                 {
                     try
                     {
@@ -74,6 +94,8 @@ namespace SmashIt
             }
             catch (Exception)
             {
+                if (!running)
+                    return;
                 SwitchToIframe(webdriver, iframe);
             }
         }
@@ -83,11 +105,13 @@ namespace SmashIt
             try
             {
                 webdriver.FindElement(By.Id("inputSession")).SendKeys(key);
-                Thread.Sleep(100);
+                Thread.Sleep(500);
                 webdriver.FindElement(By.TagName("button")).Click();
             }
             catch (Exception)
             {
+                if (!running)
+                    return;
                 fillInKey(webdriver, key);
             }
         }
@@ -97,18 +121,21 @@ namespace SmashIt
             try
             {
                 webdriver.FindElement(By.Id("username")).SendKeys(name);
-                Thread.Sleep(100);
+                Thread.Sleep(500);
                 webdriver.FindElement(By.TagName("button")).Click();
             }
             catch (Exception)
             {
+                if (!running)
+                    return;
                 fillInUser(webdriver, name);
             }
         }
 
         public void stop()
         {
-            //webdriver.Dis
+            running = false;
+            webdriver.Quit();
         }
     }
 }
